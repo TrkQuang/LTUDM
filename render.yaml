@@ -1,7 +1,7 @@
 services:
   - type: web
     name: ltudm-server
-    runtime: docker
+    env: docker
     dockerfilePath: ./Dockerfile
     plan: free
     region: singapore
