@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: ltudm-server
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: singapore
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: PORT_HTTP
+        value: 8080
+      - key: PORT_TCP
+        value: 8888

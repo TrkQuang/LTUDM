@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LTUDM - Web Chat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; color: #1e293b; height: 100vh; display: flex; align-items: center; justify-content: center; }
+        .chat-container { background: white; width: 100%; max-width: 800px; height: 90vh; border-radius: 12px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1); display: flex; flex-direction: column; overflow: hidden; }
+        .chat-header { background: #3b82f6; color: white; padding: 20px; text-align: center; font-weight: 600; font-size: 1.2rem; }
+        .chat-messages { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; background: #f8fafc; }
+        .message { max-width: 70%; padding: 12px 16px; border-radius: 12px; font-size: 0.95rem; line-height: 1.5; position: relative; }
+        .msg-other { background: #e2e8f0; align-self: flex-start; border-bottom-left-radius: 2px; }
+        .msg-self { background: #3b82f6; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .msg-system { background: #fef3c7; color: #b45309; align-self: center; font-size: 0.85rem; font-weight: 500; border-radius: 20px; padding: 6px 16px; }
+        .msg-sender { font-size: 0.75rem; font-weight: 700; margin-bottom: 4px; opacity: 0.8; }
+        .msg-time { font-size: 0.7rem; opacity: 0.7; text-align: right; margin-top: 5px; }
+        .chat-input { display: flex; padding: 15px; background: white; border-top: 1px solid #e2e8f0; gap: 10px; }
+        .chat-input input { flex: 1; padding: 12px 20px; border: 1px solid #cbd5e1; border-radius: 30px; outline: none; font-family: 'Inter'; font-size: 0.95rem; }
+        .chat-input input:focus { border-color: #3b82f6; box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1); }
+        .chat-input button { background: #3b82f6; color: white; border: none; padding: 0 25px; border-radius: 30px; font-weight: 600; cursor: pointer; transition: 0.2s; }
+        .chat-input button:hover { background: #2563eb; }
+        
+        #login-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(4px); }
+        .login-box { background: white; padding: 30px; border-radius: 12px; width: 350px; text-align: center; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1); }
+        .login-box h2 { margin-bottom: 20px; color: #1e293b; }
+        .login-box input { width: 100%; padding: 12px; border: 1px solid #cbd5e1; border-radius: 8px; margin-bottom: 15px; font-family: 'Inter'; outline: none; }
+        .login-box button { width: 100%; background: #3b82f6; color: white; padding: 12px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2>Vào phòng Chat</h2>
+            <input type="text" id="usernameInput" placeholder="Nhập tên của bạn..." onkeypress="if(event.key === 'Enter') joinChat()">
+            <button onclick="joinChat()">Tham gia</button>
+        </div>
+    </div>
+
+    <div class="chat-container">
+        <div class="chat-header">LTUDM Public Chat (Web & App)</div>
+        <div class="chat-messages" id="messagesArea">
+            <!-- Messages will appear here -->
+        </div>
+        <div class="chat-input">
+            <input type="text" id="msgInput" placeholder="Nhập tin nhắn..." onkeypress="if(event.key === 'Enter') sendMessage()">
+            <button onclick="sendMessage()">Gửi</button>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = "";
+        let lastMessageCount = 0;
+
+        function joinChat() {
+            const name = document.getElementById('usernameInput').value.trim();
+            if (!name) return alert("Vui lòng nhập tên!");
+            currentUser = name;
+            document.getElementById('login-overlay').style.display = 'none';
+            fetchMessages(); // initial fetch
+            setInterval(fetchMessages, 1000); // Polling every 1 second
+            
+            // Notify others
+            fetch('/api/chat/send', {
+                method: 'POST',
+                body: JSON.stringify({ sender: "Hệ thống", content: currentUser + " đã tham gia từ Web!", type: "SYSTEM" })
+            });
+        }
+
+        function scrollToBottom() {
+            const area = document.getElementById('messagesArea');
+            area.scrollTop = area.scrollHeight;
+        }
+
+        function renderMessages(messages) {
+            if (messages.length === lastMessageCount) return; // No new messages
+            lastMessageCount = messages.length;
+            
+            const area = document.getElementById('messagesArea');
+            area.innerHTML = "";
+            
+            messages.forEach(msg => {
+                const div = document.createElement('div');
+                
+                if (msg.type === "SYSTEM") {
+                    div.className = "message msg-system";
+                    div.innerText = msg.content;
+                } else {
+                    div.className = "message " + (msg.sender === currentUser ? "msg-self" : "msg-other");
+                    
+                    const sender = document.createElement('div');
+                    sender.className = "msg-sender";
+                    sender.innerText = msg.sender === currentUser ? "Bạn" : msg.sender;
+                    
+                    const content = document.createElement('div');
+                    content.innerText = msg.content;
+                    
+                    const time = document.createElement('div');
+                    time.className = "msg-time";
+                    time.innerText = msg.timestamp || "";
+                    
+                    div.appendChild(sender);
+                    div.appendChild(content);
+                    div.appendChild(time);
+                }
+                
+                area.appendChild(div);
+            });
+            scrollToBottom();
+        }
+
+        async function fetchMessages() {
+            try {
+                const res = await fetch('/api/chat/messages');
+                const messages = await res.json();
+                renderMessages(messages);
+            } catch (e) {
+                console.error("Lỗi khi lấy tin nhắn", e);
+            }
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('msgInput');
+            const text = input.value.trim();
+            if (!text) return;
+            
+            input.value = "";
+            
+            const msg = {
+                sender: currentUser,
+                content: text,
+                type: "PUBLIC"
+            };
+            
+            await fetch('/api/chat/send', {
+                method: 'POST',
+                body: JSON.stringify(msg)
+            });
+            
+            fetchMessages();
+        }
+    </script>
+</body>
+</html>
